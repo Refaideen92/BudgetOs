@@ -850,58 +850,47 @@ function parseSheetData(rows) {
 }
 
 async function saveSheet(monthKey) {
-  if (!spreadsheetId || !gAccessToken) return;
+  if (!spreadsheetId) { showToast('Not connected to Drive'); return; }
+  if (!gAccessToken)  { showToast('Not signed in'); return; }
   const state = monthData[monthKey];
   if (!state) return;
-
+  setSyncState('syncing', 'Saving...');
   try {
-    // Ensure sheet tab exists
     const meta = await gFetch(`${API}/${spreadsheetId}?fields=sheets.properties.title`);
-    const exists = meta.sheets.some(s=>s.properties.title===monthKey);
+    const exists = meta.sheets.some(s => s.properties.title === monthKey);
     if (!exists) {
       await gFetch(`${API}/${spreadsheetId}:batchUpdate`, {
-        method:'POST',
-        body:JSON.stringify({ requests:[{ addSheet:{ properties:{ title:monthKey } } }] })
+        method: 'POST',
+        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: monthKey } } }] })
       });
     }
-    // Write data
+    await gFetch(`${API}/${spreadsheetId}/values/${encodeURIComponent(monthKey+'!A1:Z200')}:clear`, { method: 'POST' });
     const rows = stateToRows(state);
     await gFetch(`${API}/${spreadsheetId}/values/${encodeURIComponent(monthKey+'!A1')}?valueInputOption=RAW`, {
-      method:'PUT',
-      body:JSON.stringify({ values:rows })
+      method: 'PUT',
+      body: JSON.stringify({ values: rows })
     });
-
-    // Also update Summary sheet
     await updateSummarySheet();
-
-    setSyncState('ok','Synced ✓');
+    setSyncState('ok', 'Synced');
+    showToast('Saved to Google Sheets!');
   } catch(e) {
-    setSyncState('error','Sync failed');
-    showToast('❌ Sync error: '+e.message);
+    console.error('Save error:', e.message);
+    if (e.message && e.message.includes('401')) {
+      showToast('Session expired, refreshing...');
+      silentAuth();
+      setTimeout(() => saveSheet(monthKey), 2500);
+      return;
+    }
+    setSyncState('error', 'Failed');
+    showToast('Save failed: ' + e.message);
   }
 }
 
-async function updateSummarySheet() {
-  // Build a summary row per month
-  const rows = [['Month','Income','Planned','Actual','Balance','Investments','Needs','Loans']];
-  Object.entries(monthData).forEach(([mk,s]) => {
-    const income = (s.salary||0)+(s.existBal||0)+(s.otherInc||0)+s.rentUnits.filter(u=>u.received).reduce((a,u)=>a+(u.actual||0),0);
-    const planned = s.accounts.reduce((a,x)=>a+(x.expected||0),0);
-    const actual  = s.accounts.reduce((a,x)=>a+(x.actual||0),0);
-    const invest  = s.accounts.filter(a=>a.type==='invest'||a.type==='saving').reduce((a,x)=>a+(x.actual||0),0);
-    const needs   = s.accounts.filter(a=>a.type==='expense').reduce((a,x)=>a+(x.actual||0),0);
-    const loans   = s.accounts.filter(a=>a.type==='loan').reduce((a,x)=>a+(x.actual||0),0);
-    rows.push([mk, income, planned, actual, income-actual, invest, needs, loans]);
-  });
-  await gFetch(`${API}/${spreadsheetId}/values/${encodeURIComponent('Summary!A1')}?valueInputOption=RAW`, {
-    method:'PUT', body:JSON.stringify({ values:rows })
-  });
-}
-
 function queueSave() {
-  setSyncState('syncing','Saving…');
+  if (!gAccessToken) return;
+  setSyncState('syncing', 'Saving...');
   clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => saveSheet(activeMonthKey), 1500);
+  autoSaveTimer = setTimeout(() => saveSheet(activeMonthKey), 2000);
 }
 
 async function syncNow() {
