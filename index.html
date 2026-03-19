@@ -527,10 +527,10 @@ main{max-width:1440px;margin:0 auto;padding:24px 28px;display:flex;flex-directio
     <div class="income-block">
       <div class="ib-title">💼 Salary & Balance</div>
       <div class="ib-2col">
-        <div class="field"><div class="flabel">Salary Received</div><input class="finput" id="salaryIn" type="number" placeholder="0" oninput="onIncomeChange()"/></div>
-        <div class="field"><div class="flabel">Existing Balance</div><input class="finput" id="existBalIn" type="number" placeholder="0" oninput="onIncomeChange()"/></div>
+        <div class="field"><div class="flabel">Salary Received</div><input class="finput" id="salaryIn" type="number" placeholder="0" onblur="onIncomeChange()" onkeydown="if(event.key==='Enter')this.blur()"/></div>
+        <div class="field"><div class="flabel">Existing Balance</div><input class="finput" id="existBalIn" type="number" placeholder="0" onblur="onIncomeChange()" onkeydown="if(event.key==='Enter')this.blur()"/></div>
       </div>
-      <div class="field"><div class="flabel">Other Income</div><input class="finput" id="otherIncIn" type="number" placeholder="0" oninput="onIncomeChange()"/></div>
+      <div class="field"><div class="flabel">Other Income</div><input class="finput" id="otherIncIn" type="number" placeholder="0" onblur="onIncomeChange()" onkeydown="if(event.key==='Enter')this.blur()"/></div>
     </div>
     <div class="income-block">
       <div class="ib-title">🏘️ Rent Yield Plan</div>
@@ -1064,9 +1064,9 @@ function renderIncomePage() {
     const div = document.createElement('div');
     div.className = 'rent-unit';
     div.innerHTML = `
-      <input class="ru-name" value="${u.name}" placeholder="Unit" oninput="updateRent(${u.id},'name',this.value)"/>
-      <input class="ru-inp" type="number" value="${u.expected||''}" placeholder="Expected" oninput="updateRent(${u.id},'expected',+this.value)"/>
-      <input class="ru-inp" type="number" value="${u.actual||''}" placeholder="Actual" oninput="updateRent(${u.id},'actual',+this.value)"/>
+      <input class="ru-name" value="${u.name}" placeholder="Unit" onblur="updateRent(${u.id},'name',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="ru-inp" type="number" value="${u.expected||''}" placeholder="Expected" onblur="updateRent(${u.id},'expected',+this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="ru-inp" type="number" value="${u.actual||''}" placeholder="Actual" onblur="updateRent(${u.id},'actual',+this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
       <button class="status-pill ${u.received?'pill-green':'pill-red'}" onclick="toggleRent(${u.id})">${u.received?'✓ Received':'Pending'}</button>
       <button class="del-btn" onclick="delRent(${u.id})">✕</button>`;
     el.appendChild(div);
@@ -1097,15 +1097,15 @@ function renderAccountsPage() {
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td><div class="acc-name-wrap"><div class="acc-color-dot" style="background:${col}"></div>
-        <input class="name-inp" value="${a.name}" oninput="updateAcc(${a.id},'name',this.value)"/></div></td>
+        <input class="name-inp" value="${a.name}" onblur="updateAcc(${a.id},'name',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/></div></td>
       <td><select class="type-select" onchange="updateAcc(${a.id},'type',this.value)">
         ${['invest','saving','expense','loan','charity','unplanned'].map(t=>`<option value="${t}" ${a.type===t?'selected':''}>${TYPE_LABELS[t]}</option>`).join('')}
       </select></td>
-      <td><input class="amt-inp" type="number" value="${a.expected||''}" placeholder="0" oninput="updateAcc(${a.id},'expected',+this.value)"/></td>
-      <td><input class="amt-inp ${diff>0?'over-actual':''}" type="number" value="${a.actual||''}" placeholder="0" oninput="updateAcc(${a.id},'actual',+this.value)"/></td>
+      <td><input class="amt-inp" type="number" value="${a.expected||''}" placeholder="0" onblur="updateAcc(${a.id},'expected',+this.value)" onkeydown="if(event.key==='Enter')this.blur()"/></td>
+      <td><input class="amt-inp ${diff>0?'over-actual':''}" type="number" value="${a.actual||''}" placeholder="0" onblur="updateAcc(${a.id},'actual',+this.value)" onkeydown="if(event.key==='Enter')this.blur()"/></td>
       <td class="diff-cell" style="${dcol}">${diff===0?'—':(diff>0?'+':'')+fmt(diff)}</td>
       <td><button class="status-toggle ${a.done?'st-done':'st-pending'}" onclick="toggleAccDone(${a.id})">${a.done?'✓ Done':'Pending'}</button></td>
-      <td><input class="comment-inp" value="${a.comment||''}" placeholder="Note…" oninput="updateAcc(${a.id},'comment',this.value)"/></td>
+      <td><input class="comment-inp" value="${a.comment||''}" placeholder="Note…" onblur="updateAcc(${a.id},'comment',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/></td>
       <td><button class="del-btn" onclick="delAcc(${a.id})">✕</button></td>`;
     tbody.appendChild(tr);
   });
@@ -1132,9 +1132,9 @@ function renderSharedPage() {
   s.shared.forEach(sh=>{
     const d=document.createElement('div'); d.className='shared-row';
     d.innerHTML=`
-      <input class="row-inp" value="${sh.desc}" placeholder="Description" oninput="updShared(${sh.id},'desc',this.value)"/>
-      <input class="row-inp" type="number" value="${sh.amount||''}" placeholder="Amount" oninput="updShared(${sh.id},'amount',+this.value)"/>
-      <input class="row-inp" value="${sh.note||''}" placeholder="Note" oninput="updShared(${sh.id},'note',this.value)"/>
+      <input class="row-inp" value="${sh.desc}" placeholder="Description" onblur="updShared(${sh.id},'desc',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="row-inp" type="number" value="${sh.amount||''}" placeholder="Amount" onblur="updShared(${sh.id},'amount',+this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="row-inp" value="${sh.note||''}" placeholder="Note" onblur="updShared(${sh.id},'note',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
       <button class="status-toggle ${sh.settled?'st-done':'st-pending'}" onclick="toggleShared(${sh.id})">${sh.settled?'✓ Settled':'Pending'}</button>
       <button class="del-btn" onclick="delShared(${sh.id})">✕</button>`;
     el.appendChild(d);
@@ -1153,10 +1153,10 @@ function renderCCPage() {
     document.getElementById('ccTotal').textContent='₹0'; return; }
   el.innerHTML=s.ccItems.map(c=>`
     <div class="cc-row">
-      <input class="row-inp" value="${c.desc}" placeholder="Description" oninput="updCC(${c.id},'desc',this.value)"/>
-      <input class="row-inp" value="${c.cat||''}" placeholder="Category" oninput="updCC(${c.id},'cat',this.value)"/>
-      <input class="row-inp" type="number" value="${c.amount||''}" placeholder="0" oninput="updCC(${c.id},'amount',+this.value)"/>
-      <input class="row-inp" value="${c.date||''}" placeholder="dd/mm" oninput="updCC(${c.id},'date',this.value)"/>
+      <input class="row-inp" value="${c.desc}" placeholder="Description" onblur="updCC(${c.id},'desc',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="row-inp" value="${c.cat||''}" placeholder="Category" onblur="updCC(${c.id},'cat',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="row-inp" type="number" value="${c.amount||''}" placeholder="0" onblur="updCC(${c.id},'amount',+this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
+      <input class="row-inp" value="${c.date||''}" placeholder="dd/mm" onblur="updCC(${c.id},'date',this.value)" onkeydown="if(event.key==='Enter')this.blur()"/>
       <button class="del-btn" onclick="delCC(${c.id})">✕</button>
     </div>`).join('');
   document.getElementById('ccTotal').textContent=fmt(s.ccItems.reduce((a,c)=>a+(c.amount||0),0));
