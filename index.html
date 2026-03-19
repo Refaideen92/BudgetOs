@@ -732,6 +732,7 @@ async function onAuthSuccess() {
 
   setSyncState('syncing','Loading…');
   await findOrCreateSpreadsheet();
+  if (spreadsheetId) localStorage.setItem('budgetos_sheetid_'+activeUser, spreadsheetId);
   await loadAllSheets();
   setSyncState('ok','Synced');
   initCharts();
@@ -765,22 +766,96 @@ async function gFetch(url, opts={}) {
   return res.json();
 }
 
+
 async function findOrCreateSpreadsheet() {
-  const fileName = activeUser==='me' ? 'BudgetOS_MyBudget' : 'BudgetOS_WifeBudget';
-  // Search Drive for existing file
+  const fileName     = activeUser==='me' ? 'BudgetOS_MyBudget'     : 'BudgetOS_WifeBudget';
+  const configName   = activeUser==='me' ? 'budgetos_config_me.json': 'budgetos_config_wife.json';
+
+  // Step 1 — look for config file in Drive (works across ALL devices)
   try {
-    const r = await gFetch(`${DRIVE}?q=name='${fileName}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id,name)`);
-    if (r.files && r.files.length > 0) {
-      spreadsheetId = r.files[0].id;
-      return;
+    const search = await gFetch(
+      `${DRIVE}?q=name='${configName}' and mimeType='application/json' and trashed=false&fields=files(id,name)`
+    );
+    if (search.files && search.files.length > 0) {
+      // Config found — read the spreadsheet ID from it
+      const configFileId = search.files[0].id;
+      const dlRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${configFileId}?alt=media`,
+        { headers: { 'Authorization': 'Bearer ' + gAccessToken } }
+      );
+      const config = await dlRes.json();
+      if (config.spreadsheetId) {
+        // Verify the sheet still exists
+        try {
+          await gFetch(`${API}/${config.spreadsheetId}?fields=spreadsheetId`);
+          spreadsheetId = config.spreadsheetId;
+          console.log('Found existing sheet via config:', spreadsheetId);
+          return;
+        } catch(e) {
+          console.warn('Sheet in config not found, recreating...');
+        }
+      }
     }
-  } catch(e) {}
-  // Create new
+  } catch(e) {
+    console.warn('Config search error:', e.message);
+  }
+
+  // Step 2 — no config found, create new spreadsheet
   const r = await gFetch(API, {
-    method:'POST',
-    body: JSON.stringify({ properties:{ title:fileName }, sheets:[{ properties:{ title:'Summary' } }] })
+    method: 'POST',
+    body: JSON.stringify({
+      properties: { title: fileName },
+      sheets: [{ properties: { title: 'Summary' } }]
+    })
   });
   spreadsheetId = r.spreadsheetId;
+
+  // Step 3 — save config file to Drive so ALL devices find the same sheet
+  await saveConfigToDrive(configName, spreadsheetId);
+  console.log('Created new sheet + saved config:', spreadsheetId);
+}
+
+async function saveConfigToDrive(configName, sheetId) {
+  try {
+    const configContent = JSON.stringify({ spreadsheetId: sheetId, createdAt: new Date().toISOString() });
+    const boundary = 'budgetos_boundary';
+    const body = [
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      JSON.stringify({ name: configName, mimeType: 'application/json' }),
+      `--${boundary}`,
+      'Content-Type: application/json',
+      '',
+      configContent,
+      `--${boundary}--`
+    ].join('');
+
+    // Check if config file already exists to update vs create
+    const search = await gFetch(
+      `${DRIVE}?q=name='${configName}' and mimeType='application/json' and trashed=false&fields=files(id)`
+    );
+
+    if (search.files && search.files.length > 0) {
+      // Update existing config
+      const fileId = search.files[0].id;
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { 'Authorization': 'Bearer ' + gAccessToken, 'Content-Type': 'application/json' },
+        body: configContent
+      });
+    } else {
+      // Create new config file
+      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + gAccessToken, 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body: body
+      });
+    }
+    console.log('Config saved to Drive');
+  } catch(e) {
+    console.warn('Could not save config:', e.message);
+  }
 }
 
 async function loadAllSheets() {
