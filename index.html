@@ -658,26 +658,65 @@ function selectUser(who) {
 }
 
 // ═══════════════════ AUTH ═══════════════════
+// ⬇️ Your Client ID is saved here — no need to type it every time
+const HARDCODED_CLIENT_ID = localStorage.getItem('budgetos_saved_clientid') || '';
+
 let tokenClient = null;
 
-function startAuth() {
-  const clientId = document.getElementById('clientIdInput').value.trim();
-  if (!clientId || !clientId.includes('.apps.googleusercontent.com')) {
-    showToast('⚠️ Please enter a valid Google Client ID'); return;
+function getClientId() {
+  // Use hardcoded, or saved, or typed
+  const typed = document.getElementById('clientIdInput').value.trim();
+  if (typed && typed.includes('.apps.googleusercontent.com')) {
+    localStorage.setItem('budgetos_saved_clientid', typed);
+    return typed;
   }
-  localStorage.setItem('budgetos_clientid_'+activeUser, clientId);
+  const saved = localStorage.getItem('budgetos_saved_clientid');
+  if (saved) return saved;
+  return null;
+}
 
+function startAuth() {
+  const clientId = getClientId();
+  if (!clientId) { showToast('⚠️ Please enter your Google Client ID'); return; }
+  initTokenClient(clientId);
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function silentAuth() {
+  // Called on page load — tries to sign in without showing popup
+  const clientId = getClientId();
+  if (!clientId) return; // no saved ID, show login screen normally
+  initTokenClient(clientId);
+  tokenClient.requestAccessToken({ prompt: '' }); // empty prompt = silent/auto
+}
+
+function initTokenClient(clientId) {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: SCOPES,
     callback: async (resp) => {
-      if (resp.error) { showToast('❌ Auth failed: '+resp.error); return; }
+      if (resp.error) {
+        // Silent auth failed — show login screen
+        document.getElementById('authScreen').style.display = 'flex';
+        return;
+      }
       gAccessToken = resp.access_token;
+      // Auto-refresh token 5 min before expiry (tokens last 1 hour)
+      setTimeout(() => silentAuth(), 55 * 60 * 1000);
       onAuthSuccess();
     }
   });
-  tokenClient.requestAccessToken();
 }
+
+// Pre-fill client ID if saved
+window.addEventListener('load', () => {
+  const saved = localStorage.getItem('budgetos_saved_clientid');
+  if (saved) {
+    document.getElementById('clientIdInput').value = saved;
+    // Try silent login after Google SDK loads
+    setTimeout(() => silentAuth(), 1000);
+  }
+});
 
 async function onAuthSuccess() {
   document.getElementById('authScreen').style.display = 'none';
@@ -702,9 +741,12 @@ async function onAuthSuccess() {
 
 function signOut() {
   gAccessToken = null; spreadsheetId = null;
+  // Revoke token properly
+  if (tokenClient) google.accounts.oauth2.revoke(gAccessToken, ()=>{});
   document.getElementById('authScreen').style.display = 'flex';
   document.getElementById('appHeader').style.display  = 'none';
   document.querySelectorAll('.page').forEach(p=>{p.style.display='none';});
+  showToast('👋 Signed out');
 }
 
 function showSetupModal() { document.getElementById('setupModal').style.display='flex'; }
