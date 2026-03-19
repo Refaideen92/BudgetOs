@@ -884,6 +884,22 @@ async function saveSheet(monthKey) {
     setSyncState('error', 'Failed');
     showToast('Save failed: ' + e.message);
   }
+  
+async function updateSummarySheet() {
+  // Build a summary row per month
+  const rows = [['Month','Income','Planned','Actual','Balance','Investments','Needs','Loans']];
+  Object.entries(monthData).forEach(([mk,s]) => {
+    const income = (s.salary||0)+(s.existBal||0)+(s.otherInc||0)+s.rentUnits.filter(u=>u.received).reduce((a,u)=>a+(u.actual||0),0);
+    const planned = s.accounts.reduce((a,x)=>a+(x.expected||0),0);
+    const actual  = s.accounts.reduce((a,x)=>a+(x.actual||0),0);
+    const invest  = s.accounts.filter(a=>a.type==='invest'||a.type==='saving').reduce((a,x)=>a+(x.actual||0),0);
+    const needs   = s.accounts.filter(a=>a.type==='expense').reduce((a,x)=>a+(x.actual||0),0);
+    const loans   = s.accounts.filter(a=>a.type==='loan').reduce((a,x)=>a+(x.actual||0),0);
+    rows.push([mk, income, planned, actual, income-actual, invest, needs, loans]);
+  });
+  await gFetch(`${API}/${spreadsheetId}/values/${encodeURIComponent('Summary!A1')}?valueInputOption=RAW`, {
+    method:'PUT', body:JSON.stringify({ values:rows })
+  });
 }
 
 function queueSave() {
